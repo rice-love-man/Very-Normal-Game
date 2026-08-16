@@ -44,12 +44,13 @@ EnemyBullet E_bullets[MAX_ENEMY_BULLETS] = {0};
 
 void Shoot_3Way(Vector2 basePos, float speed, float degree) {
     float angles[] = {-degree * DEG2RAD, 0.0f * DEG2RAD, degree * DEG2RAD};
+
     for (int k = 0; k < 3; k++) {
         for (int i = 0; i < MAX_ENEMY_BULLETS; i++) {
             if (!E_bullets[i].active) {
                 E_bullets[i].position = basePos;
-                E_bullets[i].speed.x = sinf(angles[k]) * speed;
-                E_bullets[i].speed.y = cosf(angles[k]) * speed;
+                E_bullets[i].speed.x = sinf(angles[k]) * (speed);
+                E_bullets[i].speed.y = cosf(angles[k]) * (speed - 2);
                 E_bullets[i].active = 1;
                 break;
             }
@@ -103,6 +104,7 @@ int main(void) {
     int max_bullets_now = 8;
     int timer = 0;
     int start = 0;
+    int shoots_timer = 0;
 
     SetTargetFPS(90);
     
@@ -132,6 +134,7 @@ int main(void) {
         else {  
             if (player.hp > 0 && stage < 3) {
                 frame_count++;
+                shoots_timer++;
 
                 if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) player.position.x += player.speed;
                 if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) player.position.x -= player.speed;
@@ -139,7 +142,9 @@ int main(void) {
                 if (player.position.x < 30) player.position.x = 30;
                 if (player.position.x > SCREEN_WIDTH - 30) player.position.x = SCREEN_WIDTH - 30;
 
-                if ((IsKeyDown(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) && shot < max_bullets_now) {
+                //単発発射
+                
+                if (IsKeyPressed(KEY_SPACE) && shot < max_bullets_now) {
                     for (int i = 0; i < max_bullets_now; i++) {
                         if (!bullets[i].active) {
                             bullets[i].position = player.position;
@@ -151,9 +156,27 @@ int main(void) {
                         }
                     }
                 }
-                if (IsKeyDown(KEY_ENTER)) {
-                    max_bullets_now = 99;
+
+                //連射
+
+                if (IsKeyDown(KEY_ENTER) && shot < max_bullets_now){
+                    if (shoots_timer >= 90){
+                        shoots_timer = 0;
+                        for (int k = 0; k < 5; k++){
+                            for (int i = 0; i < max_bullets_now; i++) {
+                                if (!bullets[i].active){
+                                    bullets[i].position = player.position;
+                                    bullets[i].speed = (Vector2){0.0f, -10.0f};
+                                    bullets[i].active = 1;
+                                    shot += 1;
+                                    PlaySound(shootSound);
+                                    break;
+                                }
+                            }
+                        }
+                    }
                 }
+                //玉の移動と削除
                 for (int i = 0; i < max_bullets_now; i++) {
                     if (bullets[i].active) {
                         bullets[i].position.x += bullets[i].speed.x;
@@ -185,8 +208,8 @@ int main(void) {
                     }
 
                     // ボス弾発射
-                    if (frame_count % (30) == 0) {
-                        if (boss.hp > (stage + 1) * 5) {
+                    if (boss.hp > (stage + 1) * 5) {
+                        if (frame_count % 30 == 0) {
                             for (int i = 0; i < MAX_ENEMY_BULLETS; i++) {
                                 if (!E_bullets[i].active) {
                                     E_bullets[i].position = boss.position;
@@ -196,10 +219,12 @@ int main(void) {
                                     break;
                                 }
                             }
-                        } else {
-                            Shoot_3Way(boss.position, 5.0f, 30.0f);
                         }
+                    } else {
+                            if (frame_count % 60 == 0)
+                            Shoot_3Way(boss.position, 2.0f, 40.0f);
                     }
+                    
                 } else {
                     for (int i = 0; i < MAX_ENEMIES; i++) {
                         if (!enemies[i].active && frame_count % (36 / (stage + 1)) == 0) {
