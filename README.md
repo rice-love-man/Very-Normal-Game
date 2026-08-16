@@ -15,4 +15,4 @@
 [←] / [A] : Move Left
 [→] / [D] : Move Right
 [Space]   : Single Shot (Tap)
-[Enter]   : Auto Fire (Hold)どう？READMEにしたよ
+[Enter]   : Auto Fire (Hold)
