@@ -5,7 +5,7 @@
 #define SCREEN_WIDTH 1400
 #define SCREEN_HEIGHT 900
 #define MAX_ENEMIES 25
-#define MAX_BULLETS 3000
+#define MAX_BULLETS 30
 #define MAX_ENEMY_BULLETS 50
 
 typedef struct {
@@ -43,14 +43,17 @@ typedef struct {
 EnemyBullet E_bullets[MAX_ENEMY_BULLETS] = {0};
 
 void Shoot_3Way(Vector2 basePos, float speed, float degree) {
-    float angles[] = {-degree * DEG2RAD, 0.0f * DEG2RAD, degree * DEG2RAD};
+    float angles[] = {-degree *2, -degree, 0.0f, degree, degree *2}; 
 
-    for (int k = 0; k < 3; k++) {
+    for (int k = 0; k < 5; k++) {
         for (int i = 0; i < MAX_ENEMY_BULLETS; i++) {
             if (!E_bullets[i].active) {
                 E_bullets[i].position = basePos;
-                E_bullets[i].speed.x = sinf(angles[k]) * (speed);
-                E_bullets[i].speed.y = cosf(angles[k]) * (speed - 2);
+
+                float rad = angles[k] * DEG2RAD;
+
+                E_bullets[i].speed.x = sinf(rad) * (speed);
+                E_bullets[i].speed.y = cosf(rad) * (speed);
                 E_bullets[i].active = 1;
                 break;
             }
@@ -74,7 +77,7 @@ void Resetgame(Player *player, Bullet bullets[], Enemy enemies[], Boss *boss, in
     *speedup = 0;
     *shot = 0;
     *frame_count = 0;
-    *max_bullets_now = 8;
+    *max_bullets_now = 10;
     
     *stage = 0;
     *start = 0; // リセット時にタイトル画面へ戻す
@@ -101,7 +104,7 @@ int main(void) {
 
     int frame_count = 0;
 
-    int max_bullets_now = 8;
+    int max_bullets_now = 10;
     int timer = 0;
     int start = 0;
     int shoots_timer = 0;
@@ -162,7 +165,7 @@ int main(void) {
                 if (IsKeyDown(KEY_ENTER) && shot < max_bullets_now){
                     if (shoots_timer >= 90){
                         shoots_timer = 0;
-                        for (int k = 0; k < 5; k++){
+                        for (int k = 0; k < max_bullets_now - 4; k++){
                             for (int i = 0; i < max_bullets_now; i++) {
                                 if (!bullets[i].active){
                                     bullets[i].position = player.position;
@@ -222,7 +225,7 @@ int main(void) {
                         }
                     } else {
                             if (frame_count % 60 == 0)
-                            Shoot_3Way(boss.position, 2.0f, 40.0f);
+                            Shoot_3Way(boss.position, 4.0f, 20.0f);
                     }
                     
                 } else {
