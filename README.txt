@@ -7,9 +7,12 @@
 [→] / [D] : 右移動
 [Space]   : 単発発射（連打）
 [Enter]   : 連射（長押し）
-
+[R] : やり直し
+[Esc] : 終了
 ーーEnglishーー
 [←] / [A] : Move Left
 [→] / [D] : Move Right
 [Space]   : Single Shot (Tap)
 [Enter]   : Auto Fire (Hold)
+[R] : Restart
+[Esc] : Quit
