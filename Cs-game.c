@@ -2,11 +2,13 @@
 #include <math.h>
 #include "raylib.h"
 
-#define SCREEN_WIDTH 1400
-#define SCREEN_HEIGHT 900
 #define MAX_ENEMIES 25
 #define MAX_BULLETS 30
+#define MAX_B_ENEMIES 5
 #define MAX_ENEMY_BULLETS 50
+
+int SCREEN_WIDTH;
+int SCREEN_HEIGHT;
 
 typedef struct {
     Vector2 position;
@@ -27,6 +29,13 @@ typedef struct {
     int hp;
 } Enemy;
 
+typedef struct{
+    Vector2 position;
+    Vector2 speed;
+    int active;
+} BoundEnemy;
+
+
 typedef struct {
     Vector2 position;
     Vector2 speed;
@@ -41,6 +50,7 @@ typedef struct {
 } EnemyBullet;
 
 EnemyBullet E_bullets[MAX_ENEMY_BULLETS] = {0};
+BoundEnemy B_enemies [MAX_B_ENEMIES] = {0};
 
 void Shoot_3Way(Vector2 basePos, float speed, float degree) {
     float angles[] = {-degree *2, -degree, 0.0f, degree, degree *2}; 
@@ -61,7 +71,7 @@ void Shoot_3Way(Vector2 basePos, float speed, float degree) {
     }
 }       
 
-void Resetgame(Player *player, Bullet bullets[], Enemy enemies[], Boss *boss, int *score, int *speedup, int *shot, int *frame_count, int *max_bullets_now, Vector2 *boss_target, int *stage, int *start) {
+void Resetgame(Player *player, Bullet bullets[], Enemy enemies[], Boss *boss, int *score, int *speedup, int *shot, int *frame_count, int *max_bullets_now, Vector2 *boss_target, int *stage, int *start, int * B_enemies_timer) {
     player->position = (Vector2){(float)SCREEN_WIDTH / 2, (float)SCREEN_HEIGHT - 50};
     player->speed = 5.0f;
     player->hp = 5;
@@ -78,22 +88,33 @@ void Resetgame(Player *player, Bullet bullets[], Enemy enemies[], Boss *boss, in
     *shot = 0;
     *frame_count = 0;
     *max_bullets_now = 10;
+    *B_enemies_timer = 0;
     
     *stage = 0;
-    *start = 0; // リセット時にタイトル画面へ戻す
+    *start = 0; 
     SetTargetFPS(90);
 
     for (int i = 0; i < MAX_BULLETS; i++) bullets[i].active = 0;
     for (int i = 0; i < MAX_ENEMIES; i++) enemies[i].active = 0;
     for (int i = 0; i < MAX_ENEMY_BULLETS; i++) E_bullets[i].active = 0;
+    for (int i = 0; i < MAX_B_ENEMIES; i++) B_enemies[i].active = 0;
 }
 
 int main(void) {
-    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Very Normal Game");
+    SetConfigFlags(FLAG_WINDOW_UNDECORATED);
+    InitWindow(1, 1, "Very Normal Game");
+    int monitor = GetCurrentMonitor();
+    SCREEN_WIDTH = GetMonitorWidth(monitor);
+    SCREEN_HEIGHT = GetMonitorHeight(monitor);
+    
+    SetWindowSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+    SetWindowPosition(0, 0);
+
     InitAudioDevice();
     Sound shootSound = LoadSound("shoot.mp3");
     Sound hitSound = LoadSound("hit.mp3");
     Sound damageSound = LoadSound("damage.mp3");
+    Sound boundSound = LoadSound("bound.mp3");
 
     int stage = 0;
     int start_text = 1;
@@ -108,12 +129,13 @@ int main(void) {
     int timer = 0;
     int start = 0;
     int shoots_timer = 0;
+    int B_enemies_timer = 0;
 
     SetTargetFPS(90);
     
     Player player = {
         .position = {(float)SCREEN_WIDTH / 2, (float)SCREEN_HEIGHT - 50},
-        .speed = 5.0f,
+        .speed = 6.0f,
         .hp = 5
     };
     Boss boss = {
@@ -121,13 +143,13 @@ int main(void) {
         .active = 0,
         .hp = 50
     };
+    
     Vector2 boss_target = {(float)SCREEN_WIDTH / 2, 200.0f};
     Bullet bullets[MAX_BULLETS] = {0};
     Enemy enemies[MAX_ENEMIES] = {0};
 
     // メインゲームループ
     while (!WindowShouldClose()) {
-
         // ---スタート画面---
         if (start == 0) {
             if (IsKeyPressed(KEY_C)) {
@@ -138,6 +160,7 @@ int main(void) {
             if (player.hp > 0 && stage < 3) {
                 frame_count++;
                 shoots_timer++;
+                B_enemies_timer++;
 
                 if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) player.position.x += player.speed;
                 if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) player.position.x -= player.speed;
@@ -194,6 +217,12 @@ int main(void) {
                 }
                 // ボス出現
                 if (speedup / 5 >= 10 && !boss.active) {
+                    for (int i = 0; i < MAX_ENEMIES; i++){
+                        enemies[i].active = 0 ;
+                    } 
+                    for (int i = 0; i < MAX_B_ENEMIES; i++){
+                        B_enemies[i].active = 0;
+                    } 
                     boss.active = 1;
                     boss.position = (Vector2){(float)SCREEN_WIDTH / 2, -100.0f};
                     speedup = 0;
@@ -224,22 +253,60 @@ int main(void) {
                             }
                         }
                     } else {
+                            //5way弾
                             if (frame_count % 60 == 0)
                             Shoot_3Way(boss.position, 4.0f, 20.0f);
                     }
                     
                 } else {
+                    //雑魚的追加
                     for (int i = 0; i < MAX_ENEMIES; i++) {
                         if (!enemies[i].active && frame_count % (36 / (stage + 1)) == 0) {
                             enemies[i].position = (Vector2){(float)GetRandomValue(50, SCREEN_WIDTH - 50), 0.0f};
-                            enemies[i].speed = (Vector2){(float)GetRandomValue(-2, 2), (float)GetRandomValue(2, 4)};
+                            enemies[i].speed = (Vector2){(float)GetRandomValue(-2, 2), (float)GetRandomValue(2, 8)};
                             enemies[i].active = 1;
                             enemies[i].hp = 1 + stage; 
                             break;
                         }
                     }
-                }
 
+                    //バウンド弾の初期位置
+                    if (B_enemies_timer >= 3600){
+                        if (frame_count % 1350 == 0){
+                            for (int i = 0;i < MAX_B_ENEMIES; i++){
+                                if (!B_enemies[i].active){
+                                    B_enemies[i].active = 1;
+                                    B_enemies[i].position = (Vector2){(float)SCREEN_WIDTH / 2, 100};
+                                    float rx = (float)GetRandomValue(2, 8);
+                                    float ry = (float)GetRandomValue(4, 12);
+                                    
+                                    if (GetRandomValue(0,1) == 0) rx *= -1.0f;
+
+                                    B_enemies[i].speed.x = rx;
+                                    B_enemies[i].speed.y = ry;
+                                    break;
+                                } 
+                            }
+                        }
+                    }
+                    //バウンド弾の移動
+                    for (int i = 0;i < MAX_B_ENEMIES; i++){
+                        if (B_enemies[i].active == 1){
+                            B_enemies[i].position.y += B_enemies[i].speed.y;
+                            B_enemies[i].position.x += B_enemies[i].speed.x;
+
+                            if (B_enemies[i].position.x > SCREEN_WIDTH - 10 || B_enemies[i].position.x < 10){
+                                B_enemies[i].speed.x *= -1.0f;
+                                PlaySound(boundSound);
+                            }
+                            if (B_enemies[i].position.y > SCREEN_HEIGHT - 10 || B_enemies[i].position.y < 10){
+                                B_enemies[i].speed.y *= -1.0f;
+                                PlaySound(boundSound);
+                            } 
+                        }
+                    }
+                }
+                //ボス弾削除&移動
                 for (int i = 0; i < MAX_ENEMY_BULLETS; i++) {
                     if (E_bullets[i].active) {
                         E_bullets[i].position.y += E_bullets[i].speed.y;
@@ -251,6 +318,7 @@ int main(void) {
                     }
                 }
 
+                //ザコ敵削除
                 for (int i = 0; i < MAX_ENEMIES; i++) {
                     if (enemies[i].active) {
                         enemies[i].position.y += enemies[i].speed.y;
@@ -292,7 +360,15 @@ int main(void) {
                         }
                     }
                 }
-
+                for (int i = 0;i < MAX_B_ENEMIES; i++){
+                    if (CheckCollisionCircles(player.position, 30.0f + stage * 3, B_enemies[i].position, 20.0f + stage *2)) {
+                        B_enemies[i].speed.x *= -1.0f;
+                        B_enemies[i].position = (Vector2){10.0f, 100.0f};
+                        B_enemies[i].speed.y *= -1.0f;
+                        player.hp -= 1;
+                        PlaySound(damageSound);
+                    }
+                }
                 for (int i = 0; i < MAX_ENEMIES; i++) {
                     if (enemies[i].active) {
                         if (CheckCollisionCircles(player.position, 30.0f + stage * 3, enemies[i].position, 14.0f + (speedup / 5.0f) + (stage * 2.0f))) {
@@ -303,6 +379,7 @@ int main(void) {
                         }
                     }
                 }
+
 
                 for (int i = 0; i < MAX_ENEMY_BULLETS; i++) {
                     if (E_bullets[i].active) {
@@ -335,7 +412,7 @@ int main(void) {
             } 
             else if (player.hp <= 0 || stage >= 3) {
                 if (IsKeyPressed(KEY_R)) {
-                    Resetgame(&player, bullets, enemies, &boss, &score, &speedup, &shot, &frame_count, &max_bullets_now, &boss_target, &stage, &start);
+                    Resetgame(&player, bullets, enemies, &boss, &score, &speedup, &shot, &frame_count, &max_bullets_now, &boss_target, &stage, &start, &B_enemies_timer);
                 }
             }
         }
@@ -346,7 +423,7 @@ int main(void) {
 
         if (start == 0) {
             // タイトル画面の描画
-            DrawText("Very\n       Normal\n                Game", 180, 100, 120, RED);
+            DrawText("Very\n       Normal\n                Game", SCREEN_WIDTH / 4 - 100, 100, 130, RED);
             DrawText("Press 'C' to Start", SCREEN_WIDTH / 2 - 180, SCREEN_HEIGHT / 2 + 100, 40, DARKGRAY);
         }
         else {
@@ -364,7 +441,11 @@ int main(void) {
                 if (boss.active) {
                     DrawCircleV(boss.position, 100.0f - stage * 10, RED);
                 }
-
+                for (int i = 0;i < MAX_B_ENEMIES; i++){
+                    if (B_enemies[i].active) {
+                        DrawCircleV(B_enemies[i].position, 20.0f + stage *2, DARKPURPLE);
+                    }
+                }
                 for (int i = 0; i < MAX_ENEMY_BULLETS; i++) {
                     if (E_bullets[i].active) {
                         DrawCircleV(E_bullets[i].position, 15.0f + stage, DARKPURPLE);
@@ -392,15 +473,20 @@ int main(void) {
                     DrawText(TextFormat("Boss hp: %d", boss.hp), SCREEN_WIDTH / 2 - 100, 20, 40, RED);
                 }
 
-                if (boss.hp <= 0 && !boss.active && timer < 900 && frame_count > 100) {
+                if (boss.hp <= 0 && !boss.active && timer < 180 && frame_count > 100) {
                     timer++;
                     DrawText("STAGE CLEAR!", SCREEN_WIDTH / 2 - 200, SCREEN_HEIGHT / 2 - 50, 60, RED);
-                    if (timer >= 540 + stage * 60) {
+                    for (int i = 0; i < MAX_ENEMIES; i++){
+                        enemies[i].active = 0;
+                    }
+                    B_enemies_timer = 0;
+                    if (timer >= 180) {
                         stage += 1;
                         boss.hp = 50 + stage * 25;
                         speedup = 0;
                         timer = 0;
-                        SetTargetFPS(90 + stage * 10);
+                        frame_count = 0;
+                        SetTargetFPS(90);
                         player.hp = 4 + stage * 2;
                         for (int i = 0; i < MAX_BULLETS; i++) bullets[i].active = 0;
                         shot = 0;
