@@ -52,7 +52,7 @@ typedef struct {
 EnemyBullet E_bullets[MAX_ENEMY_BULLETS] = {0};
 BoundEnemy B_enemies [MAX_B_ENEMIES] = {0};
 
-void Shoot_3Way(Vector2 basePos, float speed, float degree) {
+void Shoot_5Way(Vector2 basePos, float speed, float degree) {
     float angles[] = {-degree *2, -degree, 0.0f, degree, degree *2}; 
 
     for (int k = 0; k < 5; k++) {
@@ -255,7 +255,7 @@ int main(void) {
                     } else {
                             //5way弾
                             if (frame_count % 60 == 0)
-                            Shoot_3Way(boss.position, 4.0f, 20.0f);
+                            Shoot_5Way(boss.position, 4.0f, 20.0f);
                     }
                     
                 } else {
@@ -361,6 +361,8 @@ int main(void) {
                     }
                 }
                 for (int i = 0;i < MAX_B_ENEMIES; i++){
+                    if (!B_enemies[i].active) continue;
+
                     if (CheckCollisionCircles(player.position, 30.0f + stage * 3, B_enemies[i].position, 20.0f + stage *2)) {
                         B_enemies[i].speed.x *= -1.0f;
                         B_enemies[i].position = (Vector2){10.0f, 100.0f};
